@@ -61,16 +61,75 @@ class FashionEvalDataset(Dataset):
     def __getitem__(self, index):
         return self.data[index]
 
-class FashionRetrievalDataset(Dataset):
-    def __init__(self, gen_images, candidates):
-        self.gen_images = gen_images
-        self.candidates = candidates
+
+class ImageEvalDataset(Dataset):
+    def __init__(self, paths, dataset="ifashion"):
+        self.paths = paths
+        if dataset == "ifashion":
+            self.trans = transforms.ToTensor()
+        elif dataset == "polyvore":
+            self.trans = transforms.Compose([
+                transforms.Resize(512, interpolation=transforms.InterpolationMode.BILINEAR),
+                transforms.ToTensor(),
+            ])
 
     def __len__(self):
-        return len(self.gen_images)
+        return len(self.paths)
+
+    def __getitem__(self, index):
+        img_path = self.paths[index]
+        im = Image.open(img_path)
+        return self.trans(im)
+
+
+class ImageCLIPEvalDataset(Dataset):
+    def __init__(self, paths, clip_img_trans, dataset="ifashion"):
+        self.paths = paths
+        self.dataset = dataset
+        self.clip_img_trans = clip_img_trans
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, index):
+        img_path = self.paths[index]
+        im = Image.open(img_path)
+        if self.dataset == "polyvore":
+            im = transforms.Resize(512, interpolation=transforms.InterpolationMode.BILINEAR)(im)
+        return self.clip_img_trans(im)
+
+
+class ImageLpipsEvalDataset(Dataset):
+    def __init__(self, paths, dataset='ifashion'):
+        self.paths = paths
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, index):
+        img_path = self.paths[index]
+        im = Image.open(img_path)
+        if self.dataset == "polyvore":
+            im = transforms.Resize(512, interpolation=transforms.InterpolationMode.BILINEAR)(im)
+        return eval_utils.im2tensor_lpips(im)
+
+
+class FashionRetrievalDataset(Dataset):
+    def __init__(self, gen_image_paths, candidates, clip_img_trans):
+        self.gen_image_paths = gen_image_paths
+        self.candidates = candidates
+        self.trans = clip_img_trans
+
+    def __len__(self):
+        return len(self.gen_image_paths)
     
     def __getitem__(self, index):
-        return self.gen_images[index], self.candidates[index]
+        img_path = self.gen_image_paths[index]
+        im = Image.open(img_path)
+        gen_clip = self.trans(im)
+        return gen_clip, self.candidates[index]
+
 
 class FashionPersonalSimDataset(Dataset):
     def __init__(self, data):
@@ -106,13 +165,13 @@ def main():
     set_random_seed(args.seed)
 
     if args.dataset == "ifashion":
-        args.data_path = '/data/path/ifashion/xxx'
+        args.data_path = '../datasets/ifashion'
         args.pretrained_evaluator_ckpt = './compatibility_evaluator/ifashion-ckpt/ifashion_evaluator.pth'
-        args.output_dir = '/output/path/ifashion/xxx'
+        args.output_dir = '../output/ifashion'
     elif args.dataset == "polyvore":
-        args.data_path = '/data/path/polyvore/xxx'
+        args.data_path = '../datasets/polyvore'
         args.pretrained_evaluator_ckpt = './compatibility_evaluator/polyvore-ckpt/polyvore_evaluator.pth'
-        args.output_dir = '/output/path/polyvore/xxx'
+        args.output_dir = '../output/polyvore'
     else:
         raise ValueError(f"Invalid dataset: {args.dataset}.")
 
@@ -125,7 +184,7 @@ def main():
         ckpts = ast.literal_eval(args.ckpts)
     else:
         dirs = os.listdir(eval_path)
-        dirs = [d.rstrip(".npy") for d in dirs if d.startswith(f"{args.task}-checkpoint") and d.endswith(".npy") and not d.endswith("diversity.npy")]
+        dirs = [d.rstrip(".npy") for d in dirs if d.startswith(f"{args.task}-checkpoint") and d.endswith(".npy") and not d.endswith("preds.npy")]
         dirs = sorted(dirs, key=lambda x: int(x.split("-")[2]))
         ckpts = [int(d.split('-')[2]) for d in dirs]
     
@@ -140,7 +199,7 @@ def main():
 
     num_workers = args.num_workers
 
-    id_cate_dict = np.load(os.path.join(args.data_path, "new_id_cate_dict.npy"), allow_pickle=True).item()
+    id_cate_dict = np.load(os.path.join(args.data_path, "id_cate_dict.npy"), allow_pickle=True).item()
     cid_to_label = np.load('./finetuned_inception/cid_to_label.npy', allow_pickle=True).item()  # map cid to inception predicted label
     cnn_features_clip = np.load(os.path.join(args.data_path, "cnn_features_clip.npy"), allow_pickle=True)
     cnn_features_clip = torch.tensor(cnn_features_clip)
@@ -171,9 +230,7 @@ def main():
         gen_data = np.load(os.path.join(eval_path, f"{args.task}-checkpoint-{ckpt}-{scale}.npy"), allow_pickle=True).item()
         grd_data = np.load(os.path.join(eval_path, f"{args.task}-grd-new.npy"), allow_pickle=True).item()
 
-        trans = transforms.ToTensor()
-        resize = transforms.Resize(512, interpolation=transforms.InterpolationMode.BILINEAR)
-        _, _, img_trans = open_clip.create_model_and_transforms('ViT-H-14', pretrained="laion2b-s32b-b79K")
+        _, _, clip_img_trans = open_clip.create_model_and_transforms('ViT-H-14', pretrained="laion2b-s32b-b79K")
         gen4eval = []
         gen4clip = []
         gen4lpips = []
@@ -184,32 +241,27 @@ def main():
 
         txt4eval = []
         gen_cates = []
-        for uid in gen_data:
+        for uid in tqdm(gen_data):
             for oid in gen_data[uid]:
                 for img_path in gen_data[uid][oid]["image_paths"]:
-                    im = Image.open(img_path)
-                    gen4eval.append(trans(im))
-                    gen4clip.append(img_trans(im))
-                    gen4lpips.append(eval_utils.im2tensor_lpips(im))
+                    gen4eval.append(img_path)
+                    gen4clip.append(img_path)
+                    gen4lpips.append(img_path)
 
                 for cate in gen_data[uid][oid]["cates"]:
                     gen_cates.append(cid_to_label[cate.item()])
                     txt4eval.append(cate_trans(cate.item(), id_cate_dict))
         
                 for img_path in grd_data[uid][oid]["image_paths"]:
-                    im = Image.open(img_path)
-                    if args.dataset == "polyvore":
-                        im = resize(im)  # 291 --> 512
-                    grd4eval.append(trans(im))
-                    grd4clip.append(img_trans(im))
-                    grd4lpips.append(eval_utils.im2tensor_lpips(im))
+                    grd4eval.append(img_path)
+                    grd4clip.append(img_path)
+                    grd4lpips.append(img_path)
 
         # -------------------------------------------------------------- #
         #                    Calculating FID & IS                        #
         # -------------------------------------------------------------- #
-        gen_dataset = FashionEvalDataset(gen4eval)
-        grd_dataset = FashionEvalDataset(grd4eval)
-        txt_dataset = FashionEvalDataset(txt4eval)
+        gen_dataset = ImageEvalDataset(gen4eval)
+        grd_dataset = ImageEvalDataset(grd4eval, dataset=args.dataset)
         cate_dataset = FashionEvalDataset(gen_cates)
         
         print("Calculating FID Value...")
@@ -250,8 +302,9 @@ def main():
         # -------------------------------------------------------------- #
         #          Calculating CLIP score and CLIP image score           #
         # -------------------------------------------------------------- #
-        gen_dataset_clip = FashionEvalDataset(gen4clip)
-        grd_dataset_clip = FashionEvalDataset(grd4clip)
+        gen_dataset_clip = ImageCLIPEvalDataset(gen4clip, clip_img_trans, dataset=args.dataset)
+        grd_dataset_clip = ImageCLIPEvalDataset(grd4clip, clip_img_trans, dataset=args.dataset)
+        txt_dataset = FashionEvalDataset(txt4eval)
 
         print("Calculating CLIP Score...")
         clip_score = eval_utils.calculate_clip_score_given_data(
@@ -288,10 +341,10 @@ def main():
         all_candidates = []
         for uid in gen_data:
             for oid in gen_data[uid]:
-                all_candidates.append(torch.tensor(fitb_retrieval_candidates[uid][oid]))
+                all_candidates.append(torch.tensor(fitb_retrieval_candidates[int(uid)][int(oid)]))
         assert len(gen4clip) == len(all_candidates)
 
-        gen_retrieval_dataset_clip = FashionRetrievalDataset(gen4clip, all_candidates)
+        gen_retrieval_dataset_clip = FashionRetrievalDataset(gen4clip, all_candidates, clip_img_trans)
         clip_acc = eval_utils.calculate_clip_retrieval_acc_given_data(
             gen_retrieval_dataset_clip,
             cnn_features_clip,
@@ -325,8 +378,8 @@ def main():
         # -------------------------------------------------------------- #
         #                       Calculating LPIPS                        #
         # -------------------------------------------------------------- #
-        gen_dataset_lpips = FashionEvalDataset(gen4lpips)
-        grd_dataset_lpips = FashionEvalDataset(grd4lpips)
+        gen_dataset_lpips = ImageLpipsEvalDataset(gen4lpips, dataset=args.dataset)
+        grd_dataset_lpips = ImageLpipsEvalDataset(grd4lpips, dataset=args.dataset)
 
         print("Calculating LPIP Score...")
         lpip_score = eval_utils.calculate_lpips_given_data(
@@ -356,12 +409,12 @@ def main():
         gen4personal_sim["hist"] = []
         for uid in gen_data:
             for oid in gen_data[uid]:
-                for i,img_path in enumerate(gen_data[uid][oid]["image_paths"]):
+                for i, img_path in enumerate(gen_data[uid][oid]["image_paths"]):
                     cate = gen_data[uid][oid]["cates"][i].item()
                     try:
-                        gen4personal_sim["hist"].append(history[uid][cate])
+                        gen4personal_sim["hist"].append(history[int(uid)][cate])
                         im = Image.open(img_path)
-                        gen4personal_sim["gen"].append(img_trans(im))
+                        gen4personal_sim["gen"].append(clip_img_trans(im))
                     except:
                         continue
                         gen4personal_sim["hist"].append(history['null'])
@@ -390,7 +443,7 @@ def main():
         gen_num = 0
         for uid in gen_data:
             for oid in gen_data[uid]:
-                outfit = fitb_dict[uid][oid]  # 0 as blank to be filled
+                outfit = fitb_dict[int(uid)][int(oid)]  # 0 as blank to be filled
                 new_outfit = []
                 # real iid is positive, generated iid is negative
                 for iid in outfit:
@@ -403,7 +456,7 @@ def main():
 
                 for img_path in gen_data[uid][oid]["image_paths"]:
                     im = Image.open(img_path)
-                    gen_imgs.append(img_trans(im))
+                    gen_imgs.append(clip_img_trans(im))
 
         outfits = torch.tensor(outfits)
         outfit_dataset = FashionEvalDataset(outfits)
@@ -442,20 +495,20 @@ def main():
         print()
         print("## Fidelity ##")
         print(" " * 2 + f"[FID Value]: {fid_value:.2f}")
-        print(" " * 2 + f"[IS Accuracy]: {is_acc:.2f}")
         print(" " * 2 + f"[Inception Score]: {is_score:.2f}")
+        print(" " * 2 + f"[IS Accuracy]: {is_acc:.2f}")
         print(" " * 2 + f"[Inception Entropy]: {is_entropy:.2f}")
         print(" " * 2 + f"[CLIP score]: {clip_score:.2f}")
         print(" " * 2 + f"[Grd CLIP score]: {grd_clip_score:.2f}")
         print(" " * 2 + f"[CLIP image score]: {clip_img_score:.2f}")
         print(" " * 2 + f"[LPIP Score]: {lpip_score:.2f}")
         print()
-        print("## Personalization ##")
-        print(" " * 2 + f"[Personal Sim]: {personal_sim_score:.2f}")
-        print()
         print("## Compatibility ##")
         print(" " * 2 + f"[Compatibility score]: {compatibility_score:.2f}")
         print(" " * 2 + f"[Grd Compatibility score]: {grd_compatibility_score:.2f}")
+        print()
+        print("## Personalization ##")
+        print(" " * 2 + f"[Personal Sim]: {personal_sim_score:.2f}")
         print()
         print("## Retrieval Accuracy ##")
         print(" " * 2 + f"[CLIP Accuracy]: {clip_acc:.2f}")

@@ -24,7 +24,7 @@ class InceptionV3(nn.Module):
         num_features_aux = self.model.AuxLogits.fc.in_features
         self.model.AuxLogits.fc = nn.Linear(num_features_aux, num_classes)
 
-        self.model.load_state_dict(torch.load(model_path))
+        self.model.load_state_dict(torch.load(model_path, map_location="cuda:0"))
         for param in self.model.parameters():
             param.requires_grad = False
         
@@ -541,7 +541,7 @@ class CompatibilityEvaluator:
     def __init__(self, ckpt_path="", device='cuda' if torch.cuda.is_available() else 'cpu'):
         self.clip, _, _ = open_clip.create_model_and_transforms('ViT-H-14', pretrained="laion2b-s32b-b79K")
         self.evaluator = FashionEvaluator(cnn_feat_dim=1024)
-        self.evaluator.load_state_dict(torch.load(ckpt_path))
+        self.evaluator.load_state_dict(torch.load(ckpt_path, map_location="cuda:0"))
         self.device = device
 
         self.clip = self.clip.to(device)

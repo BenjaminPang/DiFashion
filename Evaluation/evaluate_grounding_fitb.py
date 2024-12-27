@@ -142,13 +142,13 @@ def main():
     set_random_seed(args.seed)
 
     if args.dataset == "ifashion":
-        args.data_path = '/data/path/ifashion/xxx'
+        args.data_path = '../datasets/ifashion'
         args.pretrained_evaluator_ckpt = './compatibility_evaluator/ifashion-ckpt/ifashion_evaluator.pth'
-        args.output_dir = '/output/path/ifashion/xxx'
+        args.output_dir = '../output/ifashion'
     elif args.dataset == "polyvore":
-        args.data_path = '/data/path/polyvore/xxx'
+        args.data_path = '../datasets/polyvore'
         args.pretrained_evaluator_ckpt = './compatibility_evaluator/polyvore-ckpt/polyvore_evaluator.pth'
-        args.output_dir = '/output/path/polyvore/xxx'
+        args.output_dir = '../output/polyvore'
     else:
         raise ValueError(f"Invalid dataset: {args.dataset}.")
 
@@ -161,7 +161,7 @@ def main():
         ckpts = ast.literal_eval(args.ckpts)
     else:
         dirs = os.listdir(eval_path)
-        dirs = [d.rstrip(".npy") for d in dirs if d.startswith(f"{args.task}-checkpoint") and not d.endswith("diversity.npy")]
+        dirs = [d.rstrip(".npy") for d in dirs if d.startswith(f"{args.task}-checkpoint") and d.endswith(".npy") and not d.endswith("preds.npy")]
         dirs = sorted(dirs, key=lambda x: int(x.split("-")[2]))
         ckpts = [int(d.split('-')[2]) for d in dirs]
     
@@ -175,7 +175,7 @@ def main():
 
     num_workers = args.num_workers
 
-    id_cate_dict = np.load(os.path.join(args.data_path, "new_id_cate_dict.npy"), allow_pickle=True).item()
+    id_cate_dict = np.load(os.path.join(args.data_path, "id_cate_dict.npy"), allow_pickle=True).item()
     all_img_paths = np.load(os.path.join(args.data_path, "all_item_image_paths.npy"), allow_pickle=True)
     cnn_features_clip = np.load(os.path.join(args.data_path, "cnn_features_clip.npy"), allow_pickle=True)
     cnn_features_clip = torch.tensor(cnn_features_clip)
@@ -199,7 +199,7 @@ def main():
 
     for ckpt in ckpts:
         try:
-            gen_data = np.load(os.path.join(eval_path, f"{args.task}-checkpoint-{ckpt}-{scale}-preds-new.npy"), allow_pickle=True).item()
+            gen_data = np.load(os.path.join(eval_path, f"{args.task}-checkpoint-{ckpt}-{scale}-preds.npy"), allow_pickle=True).item()
             pred = True
         except:
             gen_data = np.load(os.path.join(eval_path, f"{args.task}-checkpoint-{ckpt}-{scale}.npy"), allow_pickle=True).item()
@@ -227,7 +227,7 @@ def main():
                         im = Image.open(img_path)
                         gen4clip.append(img_trans(im))
                     
-                    all_candidates.append(torch.tensor(fitb_candidates[uid][oid]))
+                    all_candidates.append(torch.tensor(fitb_candidates[int(uid)][int(oid)]))
             
             assert len(gen4clip) == len(all_candidates)
 
@@ -272,8 +272,8 @@ def main():
             for oid in gen_data[uid]:
                 for gen_idx in gen_data[uid][oid]["images"]:
                     gen_idx = gen_idx.item()
-                    gen_iid = fitb_candidates[uid][oid][gen_idx]
-                    grd_iid = fitb_candidates[uid][oid][0]
+                    gen_iid = fitb_candidates[int(uid)][int(oid)][gen_idx]
+                    grd_iid = fitb_candidates[int(uid)][int(oid)][0]
 
                     if gen_idx == 0:
                         correct += 1
@@ -380,13 +380,13 @@ def main():
         gen4personal_sim["hist"] = []
         for uid in gen_data:
             for oid in gen_data[uid]:
-                for i,gen_idx in enumerate(gen_data[uid][oid]["images"]):
+                for i, gen_idx in enumerate(gen_data[uid][oid]["images"]):
                     cate = gen_data[uid][oid]["cates"][i].item()
                     try:
-                        gen4personal_sim["hist"].append(history[uid][cate])
+                        gen4personal_sim["hist"].append(history[int(uid)][cate])
                         
                         gen_idx = gen_idx.item()
-                        gen_iid = fitb_candidates[uid][oid][gen_idx]
+                        gen_iid = fitb_candidates[int(uid)][int(oid)][gen_idx]
                         gen_im = img_dataset[gen_iid]
                         gen4personal_sim["gen"].append(img_trans(gen_im))
                     except:
@@ -416,17 +416,17 @@ def main():
         grd_outfits = []
         for uid in gen_data:
             for oid in gen_data[uid]:
-                outfit = torch.tensor(fitb_test_dict[uid][oid])
-                grd_outfit = torch.tensor(fitb_test_dict[uid][oid])
+                outfit = torch.tensor(fitb_test_dict[int(uid)][int(oid)])
+                grd_outfit = torch.tensor(fitb_test_dict[int(uid)][int(oid)])
                 fill_idxes = torch.nonzero(outfit == 0).cpu().numpy()
                 for i,gen_idx in enumerate(gen_data[uid][oid]["images"]):
                     gen_idx = gen_idx.item()
-                    gen_iid = fitb_candidates[uid][oid][gen_idx]
-                    grd_iid = fitb_candidates[uid][oid][0]
+                    gen_iid = fitb_candidates[int(uid)][int(oid)][gen_idx]
+                    grd_iid = fitb_candidates[int(uid)][int(oid)][0]
                     outfit[fill_idxes[i]] = gen_iid
                     grd_outfit[fill_idxes[i]] = grd_iid
 
-                real_grd_outfit = test_grd[oid]["outfits"]
+                real_grd_outfit = test_grd[int(oid)]["outfits"]
                 assert grd_outfit.numpy().tolist() == real_grd_outfit
 
                 outfits.append(outfit)

@@ -86,8 +86,7 @@ def parse_all_args():
     )
     parser.add_argument(
         "--data_processed",
-        type=bool,
-        default=True,
+        action='store_true',
         help="if the data is processed or not."
     )
     parser.add_argument(
@@ -429,17 +428,17 @@ def main():
     data_path = os.path.join(args.data_path, args.dataset_name)
 
     if args.data_processed:
-        train_dict = np.load(os.path.join(data_path, "processed", "new_train.npy"), allow_pickle=True).item()
+        train_dict = np.load(os.path.join(data_path, "processed", "train.npy"), allow_pickle=True).item()
         train_history = np.load(os.path.join(data_path, "processed", "train_hist_latents.npy"), allow_pickle=True).item()
-        
+
         if args.mode == "test":
-            test_fitb_dict = np.load(os.path.join(data_path, "processed", "new_fitb_test.npy"), allow_pickle=True).item()
+            test_fitb_dict = np.load(os.path.join(data_path, "processed", "fitb_test.npy"), allow_pickle=True).item()
             test_history = np.load(os.path.join(data_path, "processed", "test_hist_latents.npy"), allow_pickle=True).item()
         else:
-            test_fitb_dict = np.load(os.path.join(data_path, "processed", "new_fitb_valid.npy"), allow_pickle=True).item()
+            test_fitb_dict = np.load(os.path.join(data_path, "processed", "fitb_valid.npy"), allow_pickle=True).item()
             test_history = np.load(os.path.join(data_path, "processed", "valid_hist_latents.npy"), allow_pickle=True).item()
     else:
-        train_dict = np.load(os.path.join(data_path, "train.npy"), allow_pickle=True).item()
+        # train_dict = np.load(os.path.join(data_path, "train.npy"), allow_pickle=True).item()
         valid_fitb_dict = np.load(os.path.join(data_path, "fitb_valid.npy"), allow_pickle=True).item()
         test_fitb_dict = np.load(os.path.join(data_path, "fitb_test.npy"), allow_pickle=True).item()
 
@@ -452,8 +451,8 @@ def main():
     else:
         test_grd_dict = np.load(os.path.join(data_path, "valid_grd.npy"), allow_pickle=True).item()
 
-    new_id_cate_dict = np.load(os.path.join(data_path, "new_id_cate_dict.npy"), allow_pickle=True).item()
-    all_image_paths = np.load(os.path.join(data_path, "new_all_item_image_paths.npy"), allow_pickle=True)
+    new_id_cate_dict = np.load(os.path.join(data_path, "id_cate_dict.npy"), allow_pickle=True).item()
+    all_image_paths = np.load(os.path.join(data_path, "all_item_image_paths.npy"), allow_pickle=True)
 
     img_trans = transforms.Compose(
         [
@@ -511,8 +510,8 @@ def main():
 
     train_dataset = data_utils.FashionDiffusionData(train_data_dict)
     train_dataloader = torch.utils.data.DataLoader(
-        train_dataset, 
-        shuffle=True, 
+        train_dataset,
+        shuffle=True,
         batch_size=args.train_batch_size,
         num_workers=args.dataloader_num_workers,
     )
