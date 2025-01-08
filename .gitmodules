@@ -1,0 +1,3 @@
+[submodule "show-o"]
+	path = show-o
+	url = https://github.com/showlab/Show-o.git
