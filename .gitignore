@@ -10,9 +10,6 @@ __pycache__/
 # Output directory
 output/
 
-# Show-o directory
-show-o/
-
 Evaluation/finetuned_inception/Inception-finetune-epoch300
 
 # dataset
@@ -35,3 +32,6 @@ datasets/polyvore/polyvore.rar
 datasets/polyvore/preprocess_img.py
 datasets/polyvore/processed/
 datasets/polyvore/temp
+datasets/polyvore/all_item_image_descriptions.npy
+
+datasets/falcon-refinedweb
