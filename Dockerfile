@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.0.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Shanghai
@@ -45,7 +45,7 @@ ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ \
 # 复制requirements文件
 COPY requirements.txt .
 # 首先安装CUDA版本的PyTorch
-RUN pip3 install torch==2.2.1 torchvision==0.17.1 --index-url https://download.pytorch.org/whl/cu118
+RUN pip3 install torch==2.2.1 torchvision==0.17.1 --index-url https://download.pytorch.org/whl/cu121
 # 然后安装其他依赖
 RUN pip install -r requirements.txt
 
