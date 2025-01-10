@@ -49,5 +49,9 @@ RUN pip3 install torch==2.2.1 torchvision==0.17.1 --index-url https://download.p
 # 然后安装其他依赖
 RUN pip install -r requirements.txt
 
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+
 # 启动命令
 CMD ["/bin/bash"]
