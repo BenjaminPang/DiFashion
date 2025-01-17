@@ -29,9 +29,13 @@ datasets/polyvore/all_item_image_paths.npy
 datasets/polyvore/cnn_features_clip.npy
 datasets/polyvore/image/
 datasets/polyvore/polyvore.rar
-datasets/polyvore/preprocess_img.py
+show-o/preparing_data/describe_item_via_llama.py
 datasets/polyvore/processed/
 datasets/polyvore/temp
 datasets/polyvore/all_item_image_descriptions.npy
+datasets/polyvore/instruct/
 
 datasets/falcon-refinedweb
+
+datasets/llava-instruct-150k/
+datasets/llava-pretrain/
