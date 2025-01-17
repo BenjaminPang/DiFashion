@@ -33,6 +33,9 @@ RUN apt-get update && apt-get install -y \
     cmake \
     && rm -rf /var/lib/apt/lists/*
 
+# 安装Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
 RUN python3 -m pip install --upgrade pip
 
 # 设置工作目录
