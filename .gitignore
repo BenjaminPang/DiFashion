@@ -24,6 +24,8 @@ datasets/ifashion/item_info.npy
 datasets/ifashion/preprocess_img.py
 datasets/ifashion/preprocessed_image/
 datasets/ifashion/processed/
+datasets/wandb/
+datasets/laion2B-en-aesthetic/
 
 datasets/polyvore/all_item_image_paths.npy
 datasets/polyvore/cnn_features_clip.npy

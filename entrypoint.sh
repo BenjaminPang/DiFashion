@@ -8,5 +8,7 @@ export PYTHONPATH=/workspace/DiFashion/show-o
 # 设置 WANDB API KEY
 export WANDB_API_KEY=13a431a3eec762cf4f2029a64a6078788baf7252
 
+export HUGGING_FACE_HUB_TOKEN=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
+
 # 执行传入的命令
 exec "$@"
