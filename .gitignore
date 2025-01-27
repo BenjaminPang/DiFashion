@@ -41,3 +41,9 @@ datasets/falcon-refinedweb
 
 datasets/llava-instruct-150k/
 datasets/llava-pretrain/
+
+datasets/JourneyDB/
+datasets/LAION-Aesthetics-V2-6.5plus/
+datasets/fashion_product_image_small_44k/
+datasets/fashion_product_image_44k/
+
